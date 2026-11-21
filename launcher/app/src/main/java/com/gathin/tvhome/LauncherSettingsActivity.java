@@ -343,6 +343,23 @@ public final class LauncherSettingsActivity extends Activity {
             choices.edit().putInt(HomeWidgets.PREF_ALIGN, (choices.getInt(HomeWidgets.PREF_ALIGN, 0) + 1) % 3).apply();
             layoutLabels.run();
         });
+        TextView prayerSkin = findViewById(R.id.prayerSkinChoice);
+        TextView ballSkin = findViewById(R.id.ballSkinChoice);
+        Runnable skinLabels = () -> {
+            prayerSkin.setText("Gaya kartu sholat: " + HomeWidgets.PRAYER_SKINS[HomeWidgets.prayerSkinOf(choices)]);
+            ballSkin.setText("Gaya kartu bola: " + HomeWidgets.BALL_SKINS[HomeWidgets.ballSkinOf(choices)]);
+        };
+        skinLabels.run();
+        prayerSkin.setOnClickListener(v -> {
+            choices.edit().putInt(HomeWidgets.PREF_PRAYER_SKIN,
+                    (HomeWidgets.prayerSkinOf(choices) + 1) % HomeWidgets.PRAYER_SKINS.length).apply();
+            skinLabels.run();
+        });
+        ballSkin.setOnClickListener(v -> {
+            choices.edit().putInt(HomeWidgets.PREF_BALL_SKIN,
+                    (HomeWidgets.ballSkinOf(choices) + 1) % HomeWidgets.BALL_SKINS.length).apply();
+            skinLabels.run();
+        });
         order.setOnClickListener(v -> {
             String now = HomeWidgets.orderOf(choices);
             int i = java.util.Arrays.asList(HomeWidgets.ORDERS).indexOf(now);

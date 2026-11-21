@@ -146,7 +146,54 @@ final class FootballSource {
             out.add(e);
             if (out.size() >= 12) break;
         }
-        return wrap(out);
+        return wrap(out, teamSummary(team, teamId));
+    }
+
+    /**
+     * For the full football card: the league position and points, and the last five results with the most
+     * recent one spelled out. Whatever FotMob does not give is simply left out.
+     */
+    static JSONObject teamSummary(JSONObject team, String teamId) {
+        JSONObject out = new JSONObject();
+        try {
+            JSONArray tables = team.optJSONArray("table");
+            JSONObject data = tables == null || tables.length() == 0 ? null : tables.getJSONObject(0).optJSONObject("data");
+            JSONObject table = data == null ? null : data.optJSONObject("table");
+            JSONArray rows = table == null ? null : table.optJSONArray("all");
+            for (int i = 0; rows != null && i < rows.length(); i++) {
+                JSONObject r = rows.getJSONObject(i);
+                if (teamId.equals(r.optString("id"))) {
+                    out.put("rank", r.optInt("idx"));
+                    out.put("points", r.optInt("pts"));
+                    out.put("league", data.optString("leagueName"));
+                    break;
+                }
+            }
+            JSONObject overview = team.optJSONObject("overview");
+            JSONArray form = overview == null ? null : overview.optJSONArray("teamForm");
+            if (form != null && form.length() > 0) {
+                JSONArray results = new JSONArray();
+                for (int i = Math.max(0, form.length() - 5); i < form.length(); i++) {
+                    results.put(form.getJSONObject(i).optString("resultString"));
+                }
+                out.put("form", results);
+                JSONObject last = form.getJSONObject(form.length() - 1);
+                JSONObject tip = last.optJSONObject("tooltipText");
+                JSONObject home = last.optJSONObject("home");
+                JSONObject away = last.optJSONObject("away");
+                if (tip != null && home != null && away != null) {
+                    boolean weHome = home.optBoolean("isOurTeam") || teamId.equals(home.optString("id"));
+                    int ours = weHome ? tip.optInt("homeScore") : tip.optInt("awayScore");
+                    int theirs = weHome ? tip.optInt("awayScore") : tip.optInt("homeScore");
+                    out.put("lastResult", last.optString("resultString"));
+                    out.put("lastScore", ours + "-" + theirs);
+                    out.put("lastOpponent", (weHome ? away : home).optString("name"));
+                }
+            }
+        } catch (Exception ignored) {
+            // a partial summary is still useful; the card hides what is missing
+        }
+        return out;
     }
 
     /** Teams whose name matches {@code term}: {id, name, league} each. */
@@ -327,9 +374,15 @@ final class FootballSource {
     // ---- helpers ----------------------------------------------------------------------------------
 
     private static String wrap(List<JSONObject> events) throws Exception {
+        return wrap(events, null);
+    }
+
+    private static String wrap(List<JSONObject> events, JSONObject team) throws Exception {
         JSONArray a = new JSONArray();
         for (JSONObject e : events) a.put(e);
-        return new JSONObject().put("events", a).toString();
+        JSONObject o = new JSONObject().put("events", a);
+        if (team != null && team.length() > 0) o.put("team", team);
+        return o.toString();
     }
 
     /** The first JSON array in a model's reply (it may come wrapped in a code fence or a sentence). */

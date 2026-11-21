@@ -153,6 +153,7 @@ final class HomeWidgets {
         ZonedDateTime now = ZonedDateTime.now();
         boolean prayer = prefs.getBoolean(PREF_SHOW_PRAYER, true);
         boolean football = prefs.getBoolean(PREF_SHOW_FOOTBALL, true);
+        applySkins(prayer, football);
         prayerCard.setVisibility(prayer ? View.VISIBLE : View.GONE);
         ballCard.setVisibility(football ? View.VISIBLE : View.GONE);
         if (prayer) {
@@ -168,6 +169,7 @@ final class HomeWidgets {
             maybeFetch(now.toInstant());   // a hidden card fetches nothing
         }
         arrangeCards();
+        startTicking();
         Adzan.schedule(activity);          // reminders run whether or not the prayer card shows
         // The wallpaper may have moved on (rotation, theme): refresh the frosted glass after this layout.
         row.post(this::styleCards);
@@ -360,6 +362,10 @@ final class HomeWidgets {
         // The prayer whose time began most recently, for the "telah masuk" line.
         int current = -1;
         for (int p : PrayerTimes.PRAYERS) if (times[p] <= nowMin) current = p;
+        if (prayerSkin != 0) {
+            fillPrayerSkin(now, times, next, nextMinute, nextName, current, place);
+            return;
+        }
 
         prayerPlace.setText(place);
         prayerDate.setText(today.format(DateTimeFormatter.ofPattern("d MMM yyyy", ID)) + "  ·  " + hijriText(now, false));
@@ -516,6 +522,10 @@ final class HomeWidgets {
         List<Match> list = new ArrayList<>();
         for (Match m : cachedMatches()) {
             if (stillListed(m, now)) list.add(m);
+        }
+        if (ballSkin != 0) {
+            fillBallFull(list, now);
+            return;
         }
         if (list.isEmpty()) {
             boolean never = !cacheKey().equals(prefs.getString(PREF_MATCHES_KEY, ""));
@@ -696,6 +706,397 @@ final class HomeWidgets {
         } finally {
             c.disconnect();
         }
+    }
+
+    // ---- skins ------------------------------------------------------------------------------------
+
+    /** Launcher settings → Widget Home: the look of the prayer card (0 Klasik, 1 Hitung mundur besar, 2 Bilah progres). */
+    static final String PREF_PRAYER_SKIN = "widget_prayer_skin";
+    /** The look of the football card (0 Klasik, 1 Lengkap). */
+    static final String PREF_BALL_SKIN = "widget_ball_skin";
+    static final String[] PRAYER_SKINS = {"Klasik", "Hitung mundur besar", "Bilah progres"};
+    static final String[] BALL_SKINS = {"Klasik", "Lengkap"};
+    private static final int ROW_DP = 140, RICH_ROW_DP = 190;
+    private static final int GREEN = 0xFF4ADE80, YELLOW = 0xFFFFC83D;
+
+    private int prayerSkin = -1, ballSkin = -1;
+    private final List<View> classicPrayer = new ArrayList<>(), classicBall = new ArrayList<>();
+    private View skinPrayerBig, skinPrayerBar, skinBallFull;
+    /** What the per-second countdowns count to (0 when there is nothing to count). */
+    private long prayerNextAt, prayerPrevAt, ballNextAt;
+    private boolean ballLive;
+    private boolean ticking;
+
+    static int prayerSkinOf(SharedPreferences p) {
+        return Math.max(0, Math.min(PRAYER_SKINS.length - 1, p.getInt(PREF_PRAYER_SKIN, 0)));
+    }
+
+    static int ballSkinOf(SharedPreferences p) {
+        return Math.max(0, Math.min(BALL_SKINS.length - 1, p.getInt(PREF_BALL_SKIN, 0)));
+    }
+
+    /** Swaps the cards' contents to the chosen skins and makes the row taller when a skin needs the room. */
+    private void applySkins(boolean prayerShown, boolean ballShown) {
+        android.widget.LinearLayout pc = (android.widget.LinearLayout) prayerCard;
+        android.widget.LinearLayout bc = (android.widget.LinearLayout) ballCard;
+        if (classicPrayer.isEmpty()) for (int i = 0; i < pc.getChildCount(); i++) classicPrayer.add(pc.getChildAt(i));
+        if (classicBall.isEmpty()) for (int i = 0; i < bc.getChildCount(); i++) classicBall.add(bc.getChildAt(i));
+        int ps = prayerSkinOf(prefs);
+        int bs = ballSkinOf(prefs);
+        if (ps != prayerSkin) {
+            prayerSkin = ps;
+            if (ps == 1 && skinPrayerBig == null) skinPrayerBig = inflateInto(pc, R.layout.skin_prayer_big);
+            if (ps == 2 && skinPrayerBar == null) skinPrayerBar = inflateInto(pc, R.layout.skin_prayer_bar);
+            for (View v : classicPrayer) v.setVisibility(ps == 0 ? View.VISIBLE : View.GONE);
+            if (skinPrayerBig != null) skinPrayerBig.setVisibility(ps == 1 ? View.VISIBLE : View.GONE);
+            if (skinPrayerBar != null) skinPrayerBar.setVisibility(ps == 2 ? View.VISIBLE : View.GONE);
+        }
+        if (bs != ballSkin) {
+            ballSkin = bs;
+            if (bs == 1 && skinBallFull == null) skinBallFull = inflateInto(bc, R.layout.skin_ball_full);
+            if (bs == 0) {
+                // the classic rows sort out their own visibility in updateFootball
+                for (View v : classicBall) if (v != ballEmpty) v.setVisibility(View.VISIBLE);
+            } else {
+                for (View v : classicBall) v.setVisibility(View.GONE);
+            }
+            if (skinBallFull != null) skinBallFull.setVisibility(bs == 1 ? View.VISIBLE : View.GONE);
+        }
+        boolean rich = (prayerShown && ps != 0) || (ballShown && bs != 0);
+        ViewGroup.LayoutParams lp = row.getLayoutParams();
+        int height = (int) ((rich ? RICH_ROW_DP : ROW_DP) * density);
+        if (lp != null && lp.height != height) {
+            lp.height = height;
+            row.setLayoutParams(lp);
+        }
+    }
+
+    private View inflateInto(ViewGroup card, int layout) {
+        View v = android.view.LayoutInflater.from(activity).inflate(layout, card, false);
+        card.addView(v);
+        return v;
+    }
+
+    private void fillPrayerSkin(ZonedDateTime now, int[] times, int next, int nextMinute, String nextName,
+                                int current, String place) {
+        LocalDate today = now.toLocalDate();
+        ZonedDateTime midnight = today.atStartOfDay(now.getZone());
+        int prevMinute = current >= 0 ? times[current] : times[PrayerTimes.ISYA] - 1440;
+        prayerNextAt = midnight.plusMinutes(nextMinute).toInstant().toEpochMilli();
+        prayerPrevAt = midnight.plusMinutes(prevMinute).toInstant().toEpochMilli();
+        int highlight = next >= 0 ? next : PrayerTimes.SUBUH;
+        String masehi = today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", ID));
+        String hijri = hijriText(now, false);
+        boolean big = prayerSkin == 1;
+        View root = big ? skinPrayerBig : skinPrayerBar;
+        String pre = big ? "big" : "bar";
+        int accent = big ? GREEN : YELLOW;
+        text(root, pre + "NextName", nextName);
+        text(root, pre + "NextTime", hhmm(nextMinute % 1440).replace('.', ':'));
+        if (big) {
+            text(root, "bigHijri", hijri);
+            text(root, "bigDate", masehi);
+            text(root, "bigPlace", place);
+        } else {
+            text(root, "barPlace", place);
+            text(root, "barHijri", hijri);
+            text(root, "barDate", masehi);
+        }
+        for (int i = 0; i < PrayerTimes.PRAYERS.length; i++) {
+            int p = PrayerTimes.PRAYERS[i];
+            boolean isNext = p == highlight;
+            boolean past = next >= 0 && times[p] <= now.getHour() * 60 + now.getMinute();
+            float alpha = isNext ? 1f : past ? 0.5f : 0.9f;
+            TextView name = find(root, pre + "Name" + i);
+            TextView time = find(root, pre + "Time" + i);
+            name.setText(PrayerTimes.NAMES[p]);
+            time.setText(hhmm(times[p]).replace('.', ':'));
+            name.setTextColor(isNext ? accent : 0xCCFFFFFF);
+            time.setTextColor(isNext ? accent : 0xFFFFFFFF);
+            name.setAlpha(alpha);
+            time.setAlpha(alpha);
+            if (big) {
+                android.widget.ImageView icon = root.findViewById(id("bigIcon" + i));
+                icon.setImageResource(PRAYER_ICONS[i]);
+                icon.setColorFilter(PRAYER_TINTS[i]);
+                icon.setAlpha(alpha);
+            }
+        }
+        tickPrayer(System.currentTimeMillis());
+    }
+
+    private void tickPrayer(long nowMs) {
+        if (prayerSkin == 0 || prayerNextAt == 0) return;
+        View root = prayerSkin == 1 ? skinPrayerBig : skinPrayerBar;
+        if (root == null) return;
+        long left = Math.max(0, prayerNextAt - nowMs);
+        text(root, prayerSkin == 1 ? "bigCountdown" : "barCountdown", clock(left) + " lagi");
+        long span = Math.max(1, prayerNextAt - prayerPrevAt);
+        int progress = (int) Math.max(0, Math.min(1000, (nowMs - prayerPrevAt) * 1000 / span));
+        android.widget.ProgressBar bar = root.findViewById(prayerSkin == 1 ? R.id.bigProgress : R.id.barProgress);
+        bar.setProgress(progress);
+    }
+
+    private void fillBallFull(List<Match> list, Instant now) {
+        View r = skinBallFull;
+        JSONObject team = teamSummary();
+        String teamName = FootballSource.teamName(activity);
+        if (team != null && team.has("rank")) {
+            text(r, "fullHeader", "Peringkat " + team.optInt("rank") + " \u00B7 " + team.optInt("points") + " poin");
+            text(r, "fullLeague", shortLeague(team.optString("league")));
+        } else {
+            text(r, "fullHeader", "Jadwal " + teamName);
+            text(r, "fullLeague", "");
+        }
+        Match featured = null;
+        int featuredIndex = -1;
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).start.plus(LIVE).isAfter(now)) {
+                featured = list.get(i);
+                featuredIndex = i;
+                break;
+            }
+        }
+        if (featured == null && !list.isEmpty()) {
+            featuredIndex = list.size() - 1;
+            featured = list.get(featuredIndex);
+        }
+        View mainRow = r.findViewById(R.id.fullMain);
+        TextView empty = r.findViewById(R.id.fullEmpty);
+        ballNextAt = 0;
+        ballLive = false;
+        if (featured == null) {
+            mainRow.setVisibility(View.GONE);
+            empty.setVisibility(View.VISIBLE);
+            boolean never = !cacheKey().equals(prefs.getString(PREF_MATCHES_KEY, ""));
+            String error = prefs.getString(FootballSource.PREF_ERROR, "");
+            empty.setText(!error.isEmpty() && never ? error : never ? "Memuat jadwal\u2026" : "Jadwal berikutnya belum rilis");
+        } else {
+            mainRow.setVisibility(View.VISIBLE);
+            empty.setVisibility(View.GONE);
+            Match m = featured;
+            text(r, "fullHomeName", m.homeName);
+            text(r, "fullAwayName", m.awayName);
+            Badges.show(r.findViewById(R.id.fullHomeLogo), m.homeBadge, io, main, true);
+            Badges.show(r.findViewById(R.id.fullAwayLogo), m.awayBadge, io, main, true);
+            ZonedDateTime local = m.start.atZone(ZoneId.systemDefault());
+            boolean over = !m.start.plus(LIVE).isAfter(now);
+            boolean live = !now.isBefore(m.start) && !over && !m.noTime;
+            TextView time = find(r, "fullTime");
+            TextView countdown = find(r, "fullCountdown");
+            if (over) {
+                time.setText(m.score.isEmpty() ? "\u2013" : m.score.replace("-", " - "));
+                time.setTextColor(0xFFFFFFFF);
+                text(r, "fullDay", "Selesai");
+                countdown.setText("");
+            } else if (live) {
+                time.setText(m.score.isEmpty() ? "LIVE" : m.score.replace("-", " - "));
+                time.setTextColor(MonthView.RED);
+                text(r, "fullDay", "Sedang berlangsung");
+                countdown.setText("\u25CF LIVE");
+                countdown.setTextColor(MonthView.RED);
+                ballLive = true;
+            } else {
+                time.setText(m.noTime ? "\u2013" : local.format(DateTimeFormatter.ofPattern("HH.mm", ID)));
+                time.setTextColor(0xFFFFFFFF);
+                text(r, "fullDay", dayLabel(local.toLocalDate()));
+                countdown.setTextColor(GREEN);
+                if (m.noTime) {
+                    countdown.setText("");
+                } else {
+                    ballNextAt = m.start.toEpochMilli();
+                }
+            }
+        }
+        // the last five results
+        View formRow = r.findViewById(R.id.fullFormRow);
+        JSONArray form = team == null ? null : team.optJSONArray("form");
+        if (form == null || form.length() == 0) {
+            formRow.setVisibility(View.GONE);
+        } else {
+            formRow.setVisibility(View.VISIBLE);
+            for (int i = 0; i < 5; i++) {
+                View dot = r.findViewById(id("fullForm" + i));
+                int k = form.length() - 5 + i;
+                if (k < 0) {
+                    dot.setVisibility(View.GONE);
+                    continue;
+                }
+                String res = form.optString(k);
+                dot.setVisibility(View.VISIBLE);
+                dot.getBackground().mutate().setTint(res.equals("W") ? GREEN : res.equals("L") ? 0xFFF87171 : 0xFF9CA3AF);
+            }
+            String last = team.optString("lastResult");
+            String word = last.equals("W") ? "Menang" : last.equals("L") ? "Kalah" : last.equals("D") ? "Seri" : "";
+            text(r, "fullLast", word.isEmpty() ? "" : "Terakhir: " + word + " " + team.optString("lastScore")
+                    + " vs " + team.optString("lastOpponent"));
+        }
+        // the matches after the featured one
+        int shown = 0;
+        DateTimeFormatter dm = DateTimeFormatter.ofPattern("d MMM", ID);
+        for (int i = featuredIndex + 1; i < list.size() && shown < 3; i++) {
+            Match m = list.get(i);
+            ZonedDateTime local = m.start.atZone(ZoneId.systemDefault());
+            text(r, "fullRowDate" + shown, local.format(dm));
+            Badges.show(r.findViewById(id("fullRowLogo" + shown)), m.home ? m.awayBadge : m.homeBadge, io, main, true);
+            text(r, "fullRowName" + shown, m.opponent() + (m.home ? " (K)" : " (T)"));
+            text(r, "fullRowTag" + shown, tag(m.league));
+            text(r, "fullRowTime" + shown, m.noTime ? "\u2013" : local.format(DateTimeFormatter.ofPattern("HH.mm", ID)));
+            r.findViewById(id("fullRow" + shown)).setVisibility(View.VISIBLE);
+            shown++;
+        }
+        for (int i = shown; i < 3; i++) r.findViewById(id("fullRow" + i)).setVisibility(View.GONE);
+        r.findViewById(R.id.fullDivider).setVisibility(shown > 0 ? View.VISIBLE : View.GONE);
+        tickBall(System.currentTimeMillis());
+    }
+
+    private void tickBall(long nowMs) {
+        if (ballSkin == 0 || skinBallFull == null || ballNextAt == 0 || ballLive) return;
+        long left = ballNextAt - nowMs;
+        TextView countdown = find(skinBallFull, "fullCountdown");
+        if (left <= 0) {
+            countdown.setText("Mulai");
+            return;
+        }
+        long days = left / 86_400_000L;
+        countdown.setText(days >= 2 ? days + " hari lagi" : clock(left) + " lagi");
+    }
+
+    private static String dayLabel(LocalDate date) {
+        LocalDate today = LocalDate.now();
+        if (date.equals(today)) return "Hari ini";
+        if (date.equals(today.plusDays(1))) return "Besok";
+        return date.format(DateTimeFormatter.ofPattern("EEE, d MMM", ID));
+    }
+
+    /** The FotMob team summary saved with the fixtures (position, points, form), or null. */
+    private JSONObject teamSummary() {
+        if (!cacheKey().equals(prefs.getString(PREF_MATCHES_KEY, ""))) return null;
+        try {
+            return new JSONObject(prefs.getString(PREF_MATCHES, "")).optJSONObject("team");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** "5:15:01": hours, minutes and seconds left. */
+    private static String clock(long ms) {
+        long s = ms / 1000;
+        return String.format(Locale.ROOT, "%d:%02d:%02d", s / 3600, (s / 60) % 60, s % 60);
+    }
+
+    /** The countdowns of the skins move every second while Home is in front. */
+    private final Runnable secondTick = new Runnable() {
+        @Override
+        public void run() {
+            if ((prayerSkin == 0 && ballSkin == 0) || !activity.hasWindowFocus() || activity.isFinishing()) {
+                ticking = false;
+                return;
+            }
+            long now = System.currentTimeMillis();
+            if (prayerNextAt != 0 && now >= prayerNextAt) {
+                ticking = false;
+                update();               // the next prayer came: work out the one after it
+                return;
+            }
+            tickPrayer(now);
+            tickBall(now);
+            row.postDelayed(this, 1000 - now % 1000);
+        }
+    };
+
+    private void startTicking() {
+        if (ticking || (prayerSkin == 0 && ballSkin == 0)) return;
+        ticking = true;
+        row.postDelayed(secondTick, 1000 - System.currentTimeMillis() % 1000);
+    }
+
+    /** The skins' views by name (explicit, so resource shrinking can never lose one). */
+    private static final java.util.Map<String, Integer> SKIN_IDS = new java.util.HashMap<>();
+
+    static {
+        SKIN_IDS.put("bigName0", R.id.bigName0);
+        SKIN_IDS.put("bigTime0", R.id.bigTime0);
+        SKIN_IDS.put("bigName1", R.id.bigName1);
+        SKIN_IDS.put("bigTime1", R.id.bigTime1);
+        SKIN_IDS.put("bigName2", R.id.bigName2);
+        SKIN_IDS.put("bigTime2", R.id.bigTime2);
+        SKIN_IDS.put("bigName3", R.id.bigName3);
+        SKIN_IDS.put("bigTime3", R.id.bigTime3);
+        SKIN_IDS.put("bigName4", R.id.bigName4);
+        SKIN_IDS.put("bigTime4", R.id.bigTime4);
+        SKIN_IDS.put("barName0", R.id.barName0);
+        SKIN_IDS.put("barTime0", R.id.barTime0);
+        SKIN_IDS.put("barName1", R.id.barName1);
+        SKIN_IDS.put("barTime1", R.id.barTime1);
+        SKIN_IDS.put("barName2", R.id.barName2);
+        SKIN_IDS.put("barTime2", R.id.barTime2);
+        SKIN_IDS.put("barName3", R.id.barName3);
+        SKIN_IDS.put("barTime3", R.id.barTime3);
+        SKIN_IDS.put("barName4", R.id.barName4);
+        SKIN_IDS.put("barTime4", R.id.barTime4);
+        SKIN_IDS.put("bigIcon0", R.id.bigIcon0);
+        SKIN_IDS.put("bigIcon1", R.id.bigIcon1);
+        SKIN_IDS.put("bigIcon2", R.id.bigIcon2);
+        SKIN_IDS.put("bigIcon3", R.id.bigIcon3);
+        SKIN_IDS.put("bigIcon4", R.id.bigIcon4);
+        SKIN_IDS.put("bigNextName", R.id.bigNextName);
+        SKIN_IDS.put("bigNextTime", R.id.bigNextTime);
+        SKIN_IDS.put("bigCountdown", R.id.bigCountdown);
+        SKIN_IDS.put("bigHijri", R.id.bigHijri);
+        SKIN_IDS.put("bigDate", R.id.bigDate);
+        SKIN_IDS.put("bigPlace", R.id.bigPlace);
+        SKIN_IDS.put("barNextName", R.id.barNextName);
+        SKIN_IDS.put("barNextTime", R.id.barNextTime);
+        SKIN_IDS.put("barCountdown", R.id.barCountdown);
+        SKIN_IDS.put("barPlace", R.id.barPlace);
+        SKIN_IDS.put("barHijri", R.id.barHijri);
+        SKIN_IDS.put("barDate", R.id.barDate);
+        SKIN_IDS.put("fullHeader", R.id.fullHeader);
+        SKIN_IDS.put("fullLeague", R.id.fullLeague);
+        SKIN_IDS.put("fullHomeName", R.id.fullHomeName);
+        SKIN_IDS.put("fullAwayName", R.id.fullAwayName);
+        SKIN_IDS.put("fullTime", R.id.fullTime);
+        SKIN_IDS.put("fullDay", R.id.fullDay);
+        SKIN_IDS.put("fullCountdown", R.id.fullCountdown);
+        SKIN_IDS.put("fullLast", R.id.fullLast);
+        SKIN_IDS.put("fullForm0", R.id.fullForm0);
+        SKIN_IDS.put("fullForm1", R.id.fullForm1);
+        SKIN_IDS.put("fullForm2", R.id.fullForm2);
+        SKIN_IDS.put("fullForm3", R.id.fullForm3);
+        SKIN_IDS.put("fullForm4", R.id.fullForm4);
+        SKIN_IDS.put("fullRow0", R.id.fullRow0);
+        SKIN_IDS.put("fullRowDate0", R.id.fullRowDate0);
+        SKIN_IDS.put("fullRowLogo0", R.id.fullRowLogo0);
+        SKIN_IDS.put("fullRowName0", R.id.fullRowName0);
+        SKIN_IDS.put("fullRowTag0", R.id.fullRowTag0);
+        SKIN_IDS.put("fullRowTime0", R.id.fullRowTime0);
+        SKIN_IDS.put("fullRow1", R.id.fullRow1);
+        SKIN_IDS.put("fullRowDate1", R.id.fullRowDate1);
+        SKIN_IDS.put("fullRowLogo1", R.id.fullRowLogo1);
+        SKIN_IDS.put("fullRowName1", R.id.fullRowName1);
+        SKIN_IDS.put("fullRowTag1", R.id.fullRowTag1);
+        SKIN_IDS.put("fullRowTime1", R.id.fullRowTime1);
+        SKIN_IDS.put("fullRow2", R.id.fullRow2);
+        SKIN_IDS.put("fullRowDate2", R.id.fullRowDate2);
+        SKIN_IDS.put("fullRowLogo2", R.id.fullRowLogo2);
+        SKIN_IDS.put("fullRowName2", R.id.fullRowName2);
+        SKIN_IDS.put("fullRowTag2", R.id.fullRowTag2);
+        SKIN_IDS.put("fullRowTime2", R.id.fullRowTime2);
+    }
+
+    private int id(String name) {
+        Integer v = SKIN_IDS.get(name);
+        return v == null ? View.NO_ID : v;
+    }
+
+    private TextView find(View root, String name) {
+        return root.findViewById(id(name));
+    }
+
+    private void text(View root, String name, String value) {
+        TextView t = find(root, name);
+        if (t != null) t.setText(value);
     }
 
     // ---- text -------------------------------------------------------------------------------------

@@ -130,7 +130,7 @@ Untuk Subuh, ulangi dengan nama `adzan_subuh.mp3`. Kalau tidak ada, Subuh memaka
 Buka **Launcher settings** dari Home:
 
 - **Tampilan**: jumlah aplikasi per baris (bawaan 6), baris di bawah dock, format jam, dan animasi. Pilihanmu tetap dipakai walau kamu ganti tema; tekan **Ikuti tema** kalau ingin kembali ke susunan asli tema.
-- **Widget Home**: gaya kartu, ketebalan latar, tampil/sembunyi tiap kartu, urutan kartu, dan **Lebarkan kartu**. Kalau Lebarkan kartu dimatikan, tiap kartu tetap berukuran normal dan bisa ditaruh di kiri, tengah, atau kanan (rapi kalau cuma satu atau dua kartu yang tampil).
+- **Widget Home**: gaya kartu, ketebalan latar, tampil/sembunyi tiap kartu, urutan kartu, **Lebarkan kartu**, dan **gaya kartu**: kartu sholat bisa *Klasik*, *Hitung mundur besar*, atau *Bilah progres*; kartu bola bisa *Klasik* atau *Lengkap* (peringkat liga, lima hasil terakhir, hitung mundur ke laga berikutnya; peringkat dan hasil hanya tersedia dengan sumber FotMob). Kalau Lebarkan kartu dimatikan, tiap kartu tetap berukuran normal dan bisa ditaruh di kiri, tengah, atau kanan (rapi kalau cuma satu atau dua kartu yang tampil).
 - **Jadwal sholat & adzan**: lokasi, **koreksi waktu** per sholat (tekan kiri/kanan di remote untuk mengurangi/menambah per menit, OK untuk kembali ke 0; berguna untuk menyamakan dengan masjid setempat, atau Subuh +8 menit untuk jadwal Malaysia/Muhammadiyah), mode pengingat (banner / nada / suara adzan), waktu sholat mana yang diingatkan, pilihan suara adzan, dan tombol **Tes pengingat sekarang**.
 - **Jadwal bola**: tim favorit dan sumber jadwal. FotMob langsung jalan; Gemini butuh API key gratis dari aistudio.google.com/apikey (petunjuknya muncul di layar). Mengetik key paling enak lewat aplikasi Google TV di HP.
 

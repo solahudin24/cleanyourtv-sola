@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kartu jadwal sholat, gaya "Bilah progres": place and dates on top, the next prayer with a long bar,
+     the five times in a panel underneath. Filled by HomeWidgets. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/skinPrayerBar"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical">
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:gravity="center_vertical" android:orientation="horizontal">
+                <ImageView android:layout_width="12dp" android:layout_height="12dp" android:layout_marginEnd="4dp"
+                    android:src="@drawable/ic_pin" android:importantForAccessibility="no" />
+                <TextView android:id="@+id/barPlace" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="13sp" android:fontFamily="@string/font_medium" />
+            </LinearLayout>
+            <TextView android:id="@+id/barHijri" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FF4ADE80" android:textSize="10sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <TextView android:id="@+id/barDate" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#B3FFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" android:layout_marginStart="6dp"/>
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:layout_marginEnd="10dp"
+            android:src="@drawable/ic_mosque" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:gravity="bottom" android:orientation="horizontal">
+                <TextView android:id="@+id/barNextName" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFC83D" android:textSize="17sp" android:fontFamily="@string/font_medium" />
+                <TextView android:id="@+id/barNextTime" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="17sp" android:fontFamily="@string/font_medium" android:layout_marginStart="6dp"/>
+                <View android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+                <TextView android:id="@+id/barCountdown" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#B3FFFFFF" android:textSize="11sp" android:fontFamily="@string/font_regular" android:fontFeatureSettings="tnum"/>
+            </LinearLayout>
+            <ProgressBar android:id="@+id/barProgress" style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent" android:layout_height="4dp" android:layout_marginTop="6dp"
+                android:max="1000" android:progressDrawable="@drawable/skin_progress_yellow" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="@drawable/skin_box_bg" android:orientation="horizontal"
+        android:paddingTop="6dp" android:paddingBottom="6dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            
+            <TextView android:id="@+id/barName0" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/barTime0" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            
+            <TextView android:id="@+id/barName1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/barTime1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            
+            <TextView android:id="@+id/barName2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/barTime2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            
+            <TextView android:id="@+id/barName3" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/barTime3" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            
+            <TextView android:id="@+id/barName4" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/barTime4" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

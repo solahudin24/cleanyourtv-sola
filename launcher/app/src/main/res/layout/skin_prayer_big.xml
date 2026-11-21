@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Kartu jadwal sholat, gaya "Hitung mundur besar": the next prayer in a box on the left, the title and
+     dates on the right, the five times underneath. Filled by HomeWidgets. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/skinPrayerBig"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:orientation="horizontal" android:baselineAligned="false">
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:background="@drawable/skin_box_bg" android:gravity="center"
+            android:orientation="vertical" android:paddingStart="8dp" android:paddingEnd="8dp">
+            <TextView android:id="@+id/bigNextName" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FF4ADE80" android:textSize="12sp" android:fontFamily="@string/font_medium" />
+            <TextView android:id="@+id/bigNextTime" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="28sp" android:fontFamily="@string/font_medium" android:layout_marginTop="4dp" android:letterSpacing="0.04"/>
+            <TextView android:id="@+id/bigCountdown" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#B3FFFFFF" android:textSize="11sp" android:fontFamily="@string/font_regular" android:layout_marginTop="4dp" android:fontFeatureSettings="tnum"/>
+            <ProgressBar android:id="@+id/bigProgress" style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent" android:layout_height="4dp" android:layout_marginTop="7dp"
+                android:max="1000" android:progressDrawable="@drawable/skin_progress_green" />
+        </LinearLayout>
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:gravity="center" android:orientation="vertical" android:paddingStart="8dp">
+            <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_mosque"
+                android:tint="#FF4ADE80" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/bigTitle" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FF4ADE80" android:textSize="13sp" android:fontFamily="@string/font_medium" android:layout_marginTop="4dp" android:text="Jadwal Sholat"/>
+            <TextView android:id="@+id/bigHijri" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="11sp" android:fontFamily="@string/font_regular" android:layout_marginTop="4dp"/>
+            <TextView android:id="@+id/bigDate" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#B3FFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" android:layout_marginTop="2dp"/>
+            <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginTop="3dp" android:gravity="center_vertical" android:orientation="horizontal">
+                <ImageView android:layout_width="10dp" android:layout_height="10dp" android:layout_marginEnd="3dp"
+                    android:src="@drawable/ic_pin" android:tint="#FF4ADE80" android:importantForAccessibility="no" />
+                <TextView android:id="@+id/bigPlace" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FF4ADE80" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:orientation="horizontal">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            <ImageView android:id="@+id/bigIcon0" android:layout_width="14dp" android:layout_height="14dp"
+                android:layout_marginBottom="3dp" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/bigName0" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/bigTime0" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            <ImageView android:id="@+id/bigIcon1" android:layout_width="14dp" android:layout_height="14dp"
+                android:layout_marginBottom="3dp" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/bigName1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/bigTime1" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            <ImageView android:id="@+id/bigIcon2" android:layout_width="14dp" android:layout_height="14dp"
+                android:layout_marginBottom="3dp" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/bigName2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/bigTime2" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            <ImageView android:id="@+id/bigIcon3" android:layout_width="14dp" android:layout_height="14dp"
+                android:layout_marginBottom="3dp" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/bigName3" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/bigTime3" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            <ImageView android:id="@+id/bigIcon4" android:layout_width="14dp" android:layout_height="14dp"
+                android:layout_marginBottom="3dp" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/bigName4" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#CCFFFFFF" android:textSize="10sp" android:fontFamily="@string/font_regular" />
+            <TextView android:id="@+id/bigTime4" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:singleLine="true" android:ellipsize="end" android:includeFontPadding="false"
+            android:textColor="#FFFFFFFF" android:textSize="15sp" android:fontFamily="@string/font_medium" android:layout_marginTop="3dp"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
