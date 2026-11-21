@@ -35,6 +35,8 @@ Izinkan akses penyimpanan saat diminta. File yang kamu unduh ada di `~/storage/d
 
 Unduh `tvhome-widget.apk` dari halaman **Releases** repo ini.
 
+> **Jalankan perintah adb satu baris per satu.** Tempel satu baris, tekan Enter, tunggu sampai selesai, baru baris berikutnya. Kalau beberapa baris ditempel sekaligus, `adb shell` bisa "menelan" baris-baris setelahnya sehingga tidak ikut dijalankan.
+
 ## 3. Sambungkan dan cari launcher bawaan
 
 ```
@@ -64,7 +66,7 @@ Untuk **semua pengguna baru**, baik TV-nya belum pernah memakai CleanYourTV maup
 
 Kalau sebelumnya sudah ada CleanYourTV, **pengaturan launcher lamanya ikut terhapus** (tema, wallpaper, urutan aplikasi, file yang pernah di-push). Aplikasi lain di TV tidak tersentuh.
 
-Di Termux (ganti path-nya kalau pakai komputer), jalankan berurutan:
+Di Termux (ganti path-nya kalau pakai komputer), jalankan berurutan, satu baris per satu:
 
 ```
 adb shell pm enable <launcher-bawaan>

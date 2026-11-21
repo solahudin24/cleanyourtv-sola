@@ -63,11 +63,12 @@ final class AdzanPicker {
             Toast.makeText(activity, "Izinkan akses audio, lalu pilih lagi", Toast.LENGTH_LONG).show();
             return;
         }
+        Toast.makeText(activity, "Mencari file audio di TV…", Toast.LENGTH_SHORT).show();
         Handler main = new Handler(Looper.getMainLooper());
         Thread t = new Thread(() -> {
             List<Track> tracks;
             try {
-                tracks = query(activity.getContentResolver());
+                tracks = find(activity);
             } catch (Exception e) {
                 tracks = null;
             }
@@ -105,6 +106,96 @@ final class AdzanPicker {
             String length = durationMs > 0 ? String.format(Locale.ROOT, "%d:%02d", s / 60, s % 60) : "?:??";
             return name + "\n" + length + "  \u00B7  " + (usb ? "USB" : "TV")
                     + (bytes > MAX_BYTES ? "  \u00B7  terlalu besar" : "");
+        }
+    }
+
+    private static final String[] AUDIO_EXTENSIONS = {".mp3", ".m4a", ".aac", ".ogg", ".opus", ".wav", ".flac", ".amr"};
+    private static final String[] FOLDERS = {"Download", "Downloads", "Music", "Audio", "Documents", "Ringtones",
+            "Notifications", "Movies", "Bluetooth", "Received", "Xender", "SHAREit"};
+
+    /**
+     * Files the catalogue may not know yet: one just sent to the TV is often listed only after the next
+     * media scan or a reboot. Walks the usual folders of the TV's storage and any USB stick, asks Android
+     * to catalogue what it finds, then reads the catalogue and adds anything still missing straight from the file.
+     */
+    private static List<Track> find(Context context) {
+        List<File> files = new ArrayList<>();
+        File primary = android.os.Environment.getExternalStorageDirectory();
+        walk(primary, 0, 1, files);
+        for (String folder : FOLDERS) walk(new File(primary, folder), 0, 3, files);
+        File[] volumes = new File("/storage").listFiles();
+        if (volumes != null) {
+            for (File v : volumes) {
+                String n = v.getName();
+                if (n.equals("emulated") || n.equals("self") || !v.isDirectory()) continue;
+                walk(v, 0, 3, files);
+            }
+        }
+        if (!files.isEmpty()) {
+            String[] paths = new String[files.size()];
+            for (int i = 0; i < paths.length; i++) paths[i] = files.get(i).getAbsolutePath();
+            java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(paths.length);
+            try {
+                android.media.MediaScannerConnection.scanFile(context, paths, null, (path, uri) -> done.countDown());
+                done.await(5, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (Exception ignored) {
+                // a missing scan only means the files come from the folder walk below
+            }
+        }
+        List<Track> out;
+        try {
+            out = query(context.getContentResolver());
+        } catch (Exception e) {
+            out = new ArrayList<>();
+        }
+        java.util.Set<String> listed = new java.util.HashSet<>();
+        for (Track t : out) listed.add(t.name.toLowerCase(Locale.ROOT) + "|" + t.bytes);
+        String primaryPath = primary.getAbsolutePath();
+        for (File f : files) {
+            if (out.size() >= MAX_ITEMS) break;
+            if (listed.contains(f.getName().toLowerCase(Locale.ROOT) + "|" + f.length())) continue;
+            out.add(new Track(Uri.fromFile(f), f.getName(), duration(f), f.length(),
+                    !f.getAbsolutePath().startsWith(primaryPath)));
+        }
+        return out;
+    }
+
+    private static void walk(File dir, int depth, int maxDepth, List<File> out) {
+        if (dir == null || depth > maxDepth || out.size() >= MAX_ITEMS) return;
+        File[] entries = dir.listFiles();
+        if (entries == null) return;
+        for (File f : entries) {
+            if (out.size() >= MAX_ITEMS) return;
+            String n = f.getName();
+            if (n.startsWith(".")) continue;
+            if (f.isDirectory()) {
+                if (depth < maxDepth && !n.equals("Android")) walk(f, depth + 1, maxDepth, out);
+            } else if (isAudio(n) && !out.contains(f)) {
+                out.add(f);
+            }
+        }
+    }
+
+    private static boolean isAudio(String name) {
+        String lower = name.toLowerCase(Locale.ROOT);
+        for (String ext : AUDIO_EXTENSIONS) if (lower.endsWith(ext)) return true;
+        return false;
+    }
+
+    private static long duration(File f) {
+        android.media.MediaMetadataRetriever r = new android.media.MediaMetadataRetriever();
+        try {
+            r.setDataSource(f.getAbsolutePath());
+            String d = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION);
+            return d == null ? 0 : Long.parseLong(d);
+        } catch (Exception e) {
+            return 0;
+        } finally {
+            try {
+                r.release();
+            } catch (Exception ignored) {
+                // nothing held
+            }
         }
     }
 
@@ -150,8 +241,9 @@ final class AdzanPicker {
             });
         }
         if (tracks.isEmpty()) {
-            b.setMessage("Tidak ada file audio di TV. Salin file MP3 ke folder Download atau Music, "
-                    + "atau colok flashdisk berisi file adzan, lalu coba lagi.").show();
+            b.setMessage("Tidak ada file audio di TV. Sudah dicari di penyimpanan TV (termasuk Download dan "
+                    + "Music) dan flashdisk. Salin file MP3 ke folder Download, atau colok flashdisk berisi file "
+                    + "adzan, lalu buka lagi. File yang baru dikirim langsung ikut dipindai.").show();
             return;
         }
         b.setMessage("OK: dengarkan 10 detik pertama. OK sekali lagi di file yang sama: pakai.");
