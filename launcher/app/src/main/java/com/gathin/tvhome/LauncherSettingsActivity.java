@@ -161,6 +161,7 @@ public final class LauncherSettingsActivity extends Activity {
         prayerLocation.setOnClickListener(v -> PrayerLocationPicker.show(this, () ->
                 prayerLocation.setText("Lokasi jadwal sholat: " + PrayerLocationPicker.currentName(this))));
         setUpPersonal();
+        setUpPrayerOffsets();
         setUpAdzan();
         setUpFootball();
         TextView team = findViewById(R.id.teamChoice);
@@ -438,6 +439,41 @@ public final class LauncherSettingsActivity extends Activity {
     private TextView adzanHint;
     private final TextView[] adzanPrayers = new TextView[5];
 
+
+    /** Koreksi waktu: left/right on a row moves that prayer by a minute, OK puts it back to 0. */
+    private void setUpPrayerOffsets() {
+        int[] ids = {R.id.prayerOffsetSubuh, R.id.prayerOffsetDzuhur, R.id.prayerOffsetAshar,
+                R.id.prayerOffsetMaghrib, R.id.prayerOffsetIsya};
+        for (int i = 0; i < ids.length; i++) {
+            final int index = i;
+            TextView row = findViewById(ids[i]);
+            String name = PrayerTimes.NAMES[PrayerTimes.PRAYERS[i]];
+            Runnable label = () -> {
+                int v = PrayerTimes.offset(choices, index);
+                row.setText("Koreksi " + name + ": " + (v > 0 ? "+" : "") + v + " menit   \u25C0 \u25B6");
+            };
+            label.run();
+            row.setOnKeyListener((v, keyCode, event) -> {
+                if (keyCode != android.view.KeyEvent.KEYCODE_DPAD_LEFT
+                        && keyCode != android.view.KeyEvent.KEYCODE_DPAD_RIGHT) return false;
+                if (event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                    int step = keyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : -1;
+                    int next = Math.max(-PrayerTimes.MAX_OFFSET, Math.min(PrayerTimes.MAX_OFFSET,
+                            PrayerTimes.offset(choices, index) + step));
+                    choices.edit().putInt(PrayerTimes.OFFSET_KEYS[index], next).apply();
+                    label.run();
+                    Adzan.schedule(this);
+                }
+                return true;
+            });
+            row.setOnClickListener(v -> {
+                choices.edit().putInt(PrayerTimes.OFFSET_KEYS[index], 0).apply();
+                label.run();
+                Adzan.schedule(this);
+            });
+        }
+    }
+
     private void setUpAdzan() {
         adzanChoice = findViewById(R.id.adzanChoice);
         adzanHint = findViewById(R.id.adzanHint);
@@ -456,6 +492,21 @@ public final class LauncherSettingsActivity extends Activity {
                 refreshAdzan();
             });
         }
+        TextView adzanFile = findViewById(R.id.adzanFileChoice);
+        TextView adzanSubuhFile = findViewById(R.id.adzanSubuhFileChoice);
+        Runnable fileLabels = () -> {
+            adzanFile.setText("Suara adzan: " + AdzanPicker.currentName(this, false));
+            adzanSubuhFile.setText("Suara adzan Subuh: " + AdzanPicker.currentName(this, true));
+        };
+        fileLabels.run();
+        adzanFile.setOnClickListener(v -> AdzanPicker.show(this, false, () -> {
+            fileLabels.run();
+            refreshAdzan();
+        }));
+        adzanSubuhFile.setOnClickListener(v -> AdzanPicker.show(this, true, () -> {
+            fileLabels.run();
+            refreshAdzan();
+        }));
         findViewById(R.id.adzanTest).setOnClickListener(v -> {
             int mode = Adzan.mode(this);
             Adzan.announce(this, 3, mode == Adzan.OFF ? Adzan.BANNER : mode);
@@ -481,8 +532,8 @@ public final class LauncherSettingsActivity extends Activity {
             hint.append("\nIzin \"tampil di atas aplikasi lain\" belum diberikan, jadi banner belum bisa muncul.");
         }
         if (mode == Adzan.SOUND) {
-            hint.append(Adzan.file(this, false) != null ? "\nFile adzan.mp3 ditemukan."
-                    : "\nFile adzan.mp3 belum ada di TV; sementara diganti nada singkat.");
+            hint.append(Adzan.file(this, false) != null ? "\nSuara adzan siap."
+                    : "\nSuara adzan belum dipilih; sementara diganti nada singkat. Pilih lewat \"Suara adzan\" di bawah.");
             if (Adzan.file(this, true) != null && Adzan.file(this, true).getName().equals(Adzan.FILE_SUBUH)) {
                 hint.append(" Subuh memakai adzan_subuh.mp3.");
             }

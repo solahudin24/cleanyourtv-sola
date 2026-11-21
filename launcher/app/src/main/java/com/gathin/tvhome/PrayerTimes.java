@@ -22,6 +22,23 @@ final class PrayerTimes {
     private PrayerTimes() {
     }
 
+    /** Per-prayer correction in minutes, in the order of {@link #PRAYERS}; chosen in Launcher settings. */
+    static final String[] OFFSET_KEYS = {"prayer_offset_subuh", "prayer_offset_dzuhur", "prayer_offset_ashar",
+            "prayer_offset_maghrib", "prayer_offset_isya"};
+    static final int MAX_OFFSET = 30;
+
+    static int offset(android.content.SharedPreferences prefs, int prayerIndex) {
+        return Math.max(-MAX_OFFSET, Math.min(MAX_OFFSET, prefs.getInt(OFFSET_KEYS[prayerIndex], 0)));
+    }
+
+    /** {@link #compute} with the corrections from Launcher settings added; sunrise is never corrected. */
+    static int[] adjusted(android.content.SharedPreferences prefs, LocalDate date, double lat, double lng,
+                          double elevation, double tzHours) {
+        int[] t = compute(date, lat, lng, elevation, tzHours);
+        for (int i = 0; i < PRAYERS.length; i++) t[PRAYERS[i]] += offset(prefs, i);
+        return t;
+    }
+
     /**
      * Minutes after local midnight for Subuh, Terbit, Dzuhur, Ashar, Maghrib and Isya on {@code date}.
      *

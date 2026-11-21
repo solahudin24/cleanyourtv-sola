@@ -337,7 +337,7 @@ final class HomeWidgets {
         String place = prefs.getString(PREF_NAME, DEFAULT_NAME);
         LocalDate today = now.toLocalDate();
         double tz = now.getOffset().getTotalSeconds() / 3600.0;
-        int[] times = PrayerTimes.compute(today, lat, lon, elev, tz);
+        int[] times = PrayerTimes.adjusted(prefs, today, lat, lon, elev, tz);
         int nowMin = now.getHour() * 60 + now.getMinute();
 
         int next = -1;
@@ -353,7 +353,7 @@ final class HomeWidgets {
             nextMinute = times[next];
             nextName = PrayerTimes.NAMES[next];
         } else {
-            int[] tomorrow = PrayerTimes.compute(today.plusDays(1), lat, lon, elev, tz);
+            int[] tomorrow = PrayerTimes.adjusted(prefs, today.plusDays(1), lat, lon, elev, tz);
             nextMinute = tomorrow[PrayerTimes.SUBUH] + 1440;
             nextName = PrayerTimes.NAMES[PrayerTimes.SUBUH];
         }

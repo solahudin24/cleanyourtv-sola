@@ -109,7 +109,7 @@ final class Adzan {
         for (int day = 0; day < 2 && which < 0; day++) {
             LocalDate date = now.toLocalDate().plusDays(day);
             ZonedDateTime noon = date.atTime(12, 0).atZone(ZoneId.systemDefault());
-            int[] times = PrayerTimes.compute(date, lat, lon, elev, noon.getOffset().getTotalSeconds() / 3600.0);
+            int[] times = PrayerTimes.adjusted(p, date, lat, lon, elev, noon.getOffset().getTotalSeconds() / 3600.0);
             for (int i = 0; i < PrayerTimes.PRAYERS.length; i++) {
                 if (!enabled(c, i)) continue;
                 int minute = times[PrayerTimes.PRAYERS[i]];

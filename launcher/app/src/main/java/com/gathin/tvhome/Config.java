@@ -749,14 +749,12 @@ final class Config {
             // Existing preferences survive an app upgrade, unless the first launch follows an
             // explicit theme push or reset by the updated tools.
             SharedPreferences.Editor editor = choices.edit();
-            if (!"absent".equals(token)) editor.remove("columns").remove("animations")
-                    .remove("advanced_effects").remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY)
-                    .remove(DOCK_OPACITY_KEY).remove(CLOCK_FORMAT_KEY);
+            // CleanYourTV Sola: the layout chosen on the TV (columns, rows, dock, clock, motion) outlives a theme
+            // change; only the wallpaper choice goes, since the new theme brings its own collection.
+            if (!"absent".equals(token)) editor.remove(WALLPAPER_CHOICE_KEY);
             editor.putString(THEME_SIGNATURE_KEY, signature).commit();
         } else if (!seen.equals(signature)) {
-            choices.edit().remove("columns").remove("animations").remove("advanced_effects")
-                    .remove(ROWS_BELOW_DOCK_KEY).remove(WALLPAPER_CHOICE_KEY).remove(DOCK_OPACITY_KEY)
-                    .remove(CLOCK_FORMAT_KEY).putString(THEME_SIGNATURE_KEY, signature).commit();
+            choices.edit().remove(WALLPAPER_CHOICE_KEY).putString(THEME_SIGNATURE_KEY, signature).commit();
         }
     }
 

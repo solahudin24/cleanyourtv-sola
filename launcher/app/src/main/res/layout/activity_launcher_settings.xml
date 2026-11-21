@@ -195,6 +195,26 @@
             style="@style/SettingsRow"
             android:layout_marginTop="12dp" />
         <TextView
+            android:id="@+id/prayerOffsetSubuh"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+        <TextView
+            android:id="@+id/prayerOffsetDzuhur"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+        <TextView
+            android:id="@+id/prayerOffsetAshar"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+        <TextView
+            android:id="@+id/prayerOffsetMaghrib"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+        <TextView
+            android:id="@+id/prayerOffsetIsya"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+        <TextView
             android:id="@+id/adzanChoice"
             style="@style/SettingsRow"
             android:layout_marginTop="10dp" />
@@ -210,6 +230,14 @@
             <TextView android:id="@+id/adzan3" style="@style/SettingsColumnChoice" />
             <TextView android:id="@+id/adzan4" style="@style/SettingsColumnChoice" android:layout_marginEnd="0dp" />
         </LinearLayout>
+        <TextView
+            android:id="@+id/adzanFileChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
+        <TextView
+            android:id="@+id/adzanSubuhFileChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
         <TextView
             android:id="@+id/adzanTest"
             style="@style/SettingsRow"

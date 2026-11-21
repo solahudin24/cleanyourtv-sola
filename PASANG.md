@@ -102,23 +102,34 @@ Yang pertama supaya banner adzan bisa tampil di atas aplikasi lain, yang kedua s
 
 ## 6. Suara adzan (opsional)
 
-Launcher ini **tidak menyertakan** suara adzan. Siapkan file MP3 adzan pilihanmu sendiri, beri nama `adzan.mp3`, lalu:
+Launcher ini **tidak menyertakan** suara adzan. Siapkan file MP3 adzan pilihanmu sendiri. Supaya ringan, kecilkan dulu (misalnya jadi mono 48 kbps, sekitar 1,5 MB untuk adzan 4 menit); batasnya 15 MB.
+
+**Cara termudah: pilih dari TV.** Salin file-nya ke TV (lewat flashdisk, atau unduh ke folder Download), lalu buka **Launcher settings → Suara adzan**. Pilih file, tekan **OK** untuk mendengarkan 10 detik pertama, lalu **OK** sekali lagi untuk memakainya. File disalin ke launcher, jadi flashdisk boleh dicabut setelahnya. Ada juga **Suara adzan Subuh** kalau kamu punya versi khusus Subuh.
+
+Saat pertama kali, TV meminta izin akses audio; pilih **Izinkan**. Kalau pertanyaan itu tidak muncul, beri izin lewat adb:
+
+```
+adb shell pm grant com.gathin.tvhome android.permission.READ_MEDIA_AUDIO
+```
+
+(Di TV Android 12 ke bawah, ganti `READ_MEDIA_AUDIO` dengan `READ_EXTERNAL_STORAGE`.)
+
+**Cara lain: kirim lewat adb**, tanpa menyalin ke TV dulu:
 
 ```
 adb push ~/storage/downloads/adzan.mp3 /data/local/tmp/adzan.mp3
 adb shell 'content write --uri content://com.gathin.tvhome.theme/adzan.mp3 < /data/local/tmp/adzan.mp3; rm /data/local/tmp/adzan.mp3'
 ```
 
-Mau adzan khusus Subuh? Ulangi dengan nama `adzan_subuh.mp3`. Kalau tidak ada, Subuh memakai `adzan.mp3`.
-
-Supaya ringan, kecilkan dulu file-nya (misalnya jadi mono 48 kbps, sekitar 1,5 MB untuk adzan 4 menit).
+Untuk Subuh, ulangi dengan nama `adzan_subuh.mp3`. Kalau tidak ada, Subuh memakai suara adzan biasa.
 
 ## 7. Atur di TV
 
 Buka **Launcher settings** dari Home:
 
+- **Tampilan**: jumlah aplikasi per baris (bawaan 6), baris di bawah dock, format jam, dan animasi. Pilihanmu tetap dipakai walau kamu ganti tema; tekan **Ikuti tema** kalau ingin kembali ke susunan asli tema.
 - **Widget Home**: gaya kartu, ketebalan latar, tampil/sembunyi tiap kartu, urutan kartu, dan **Lebarkan kartu**. Kalau Lebarkan kartu dimatikan, tiap kartu tetap berukuran normal dan bisa ditaruh di kiri, tengah, atau kanan (rapi kalau cuma satu atau dua kartu yang tampil).
-- **Jadwal sholat & adzan**: lokasi, mode pengingat (banner / nada / suara adzan), waktu sholat mana yang diingatkan, dan tombol **Tes pengingat sekarang**.
+- **Jadwal sholat & adzan**: lokasi, **koreksi waktu** per sholat (tekan kiri/kanan di remote untuk mengurangi/menambah per menit, OK untuk kembali ke 0; berguna untuk menyamakan dengan masjid setempat, atau Subuh +8 menit untuk jadwal Malaysia/Muhammadiyah), mode pengingat (banner / nada / suara adzan), waktu sholat mana yang diingatkan, pilihan suara adzan, dan tombol **Tes pengingat sekarang**.
 - **Jadwal bola**: tim favorit dan sumber jadwal. FotMob langsung jalan; Gemini butuh API key gratis dari aistudio.google.com/apikey (petunjuknya muncul di layar). Mengetik key paling enak lewat aplikasi Google TV di HP.
 
 Pengingat adzan hanya bunyi saat TV menyala. Tekan **Home** untuk menghentikan adzan yang sedang diputar.

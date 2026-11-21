@@ -9,6 +9,10 @@
 
     <!-- Home widgets: the football fixtures and the postal-code lookup (HomeWidgets, PrayerLocationPicker). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Suara adzan dari file di TV (Launcher settings): reading the audio files the owner picks from. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
     <!-- Adzan reminders (Adzan): the banner over other apps, the alarm on time, and setting it again after a reboot. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
