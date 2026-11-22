@@ -133,6 +133,11 @@ final class FootballSource {
             e.put("strAwayTeamBadge", badge(awayId));
             JSONObject tournament = m.optJSONObject("tournament");
             e.put("strLeague", tournament == null ? "" : tournament.optString("name"));
+            // FotMob's own word on where the match stands: the card goes by this, not by a guessed length.
+            e.put("fmStatus", true);
+            e.put("fmStarted", status.optBoolean("started"));
+            e.put("fmFinished", status.optBoolean("finished"));
+            e.put("liveText", liveText(status));
             if (status.optBoolean("started")) {
                 String[] score = status.optString("scoreStr").split("-");
                 if (score.length == 2) {
@@ -146,7 +151,75 @@ final class FootballSource {
             out.add(e);
             if (out.size() >= 12) break;
         }
-        return wrap(out, teamSummary(team, teamId));
+        JSONObject summary = teamSummary(team, teamId);
+        applyLatestFinished(summary, list, teamId);
+        return wrap(out, summary);
+    }
+
+    /**
+     * The minute FotMob shows for a match in play ("67'", "45+2'"), or "HT" at half time; "" when it gives
+     * none. The field names are read loosely: whatever is missing just leaves the card saying LIVE.
+     */
+    static String liveText(JSONObject status) {
+        JSONObject reason = status.optJSONObject("reason");
+        String key = reason == null ? "" : reason.optString("shortKey");
+        JSONObject live = status.optJSONObject("liveTime");
+        String shortText = live == null ? "" : live.optString("short").trim();
+        if (key.startsWith("halftime") || "HT".equalsIgnoreCase(shortText)) return "HT";
+        return shortText;
+    }
+
+    /**
+     * FotMob fills the team's form a little after the fixture list. If the newest finished fixture is
+     * newer than the last form entry, the summary takes it from the fixture so "Terakhir" does not wait.
+     */
+    static void applyLatestFinished(JSONObject summary, JSONArray fixtures, String teamId) {
+        try {
+            JSONObject best = null;
+            Instant bestStart = null;
+            for (int i = 0; i < fixtures.length(); i++) {
+                JSONObject m = fixtures.getJSONObject(i);
+                JSONObject status = m.optJSONObject("status");
+                if (status == null || !status.optBoolean("finished") || status.optBoolean("cancelled")) continue;
+                Instant start;
+                try {
+                    start = Instant.parse(status.optString("utcTime"));
+                } catch (RuntimeException e) {
+                    continue;
+                }
+                if (bestStart == null || start.isAfter(bestStart)) {
+                    best = m;
+                    bestStart = start;
+                }
+            }
+            if (best == null) return;
+            String[] score = best.getJSONObject("status").optString("scoreStr").split("-");
+            if (score.length != 2) return;
+            JSONObject home = best.getJSONObject("home");
+            JSONObject away = best.getJSONObject("away");
+            boolean weHome = teamId.equals(home.optString("id"));
+            if (!weHome && !teamId.equals(away.optString("id"))) return;
+            int homeGoals = Integer.parseInt(score[0].trim());
+            int awayGoals = Integer.parseInt(score[1].trim());
+            int ours = weHome ? homeGoals : awayGoals;
+            int theirs = weHome ? awayGoals : homeGoals;
+            long formUntil = summary.optLong("lastStartMs", 0);
+            if (formUntil >= bestStart.toEpochMilli()) return;   // the form already has this match
+            String result = ours > theirs ? "W" : ours < theirs ? "L" : "D";
+            JSONArray form = summary.optJSONArray("form");
+            JSONArray next = new JSONArray();
+            if (form != null) {
+                for (int i = Math.max(0, form.length() - 4); i < form.length(); i++) next.put(form.get(i));
+            }
+            next.put(result);
+            summary.put("form", next);
+            summary.put("lastResult", result);
+            summary.put("lastScore", ours + "-" + theirs);
+            summary.put("lastOpponent", (weHome ? away : home).optString("name"));
+            summary.put("lastStartMs", bestStart.toEpochMilli());
+        } catch (Exception ignored) {
+            // the form from FotMob's own summary stays as it was
+        }
     }
 
     /**
@@ -185,6 +258,11 @@ final class FootballSource {
                     boolean weHome = home.optBoolean("isOurTeam") || teamId.equals(home.optString("id"));
                     int ours = weHome ? tip.optInt("homeScore") : tip.optInt("awayScore");
                     int theirs = weHome ? tip.optInt("awayScore") : tip.optInt("homeScore");
+                    try {
+                        out.put("lastStartMs", Instant.parse(last.getJSONObject("date").optString("utcTime")).toEpochMilli());
+                    } catch (RuntimeException | org.json.JSONException ignored) {
+                        // without the date the fixture list may replace "Terakhir" a little early; harmless
+                    }
                     out.put("lastResult", last.optString("resultString"));
                     out.put("lastScore", ours + "-" + theirs);
                     out.put("lastOpponent", (weHome ? away : home).optString("name"));

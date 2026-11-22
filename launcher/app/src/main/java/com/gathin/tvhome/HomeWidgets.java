@@ -148,8 +148,18 @@ final class HomeWidgets {
         row.setVisibility(View.VISIBLE);
     }
 
+    /** Home came back to the front: a match in play gets fresh data at once if it is over a minute old. */
+    void onHomeResumed() {
+        resumedFetch = true;
+        update();
+    }
+
+    private boolean resumedFetch;
+
     /** Called on every return to Home and once a minute with the clock. */
     void update() {
+        boolean resumed = resumedFetch;
+        resumedFetch = false;
         ZonedDateTime now = ZonedDateTime.now();
         boolean prayer = prefs.getBoolean(PREF_SHOW_PRAYER, true);
         boolean football = prefs.getBoolean(PREF_SHOW_FOOTBALL, true);
@@ -166,7 +176,7 @@ final class HomeWidgets {
         updateCalendar(now);
         if (football) {
             updateFootball(now.toInstant());
-            maybeFetch(now.toInstant());   // a hidden card fetches nothing
+            maybeFetch(now.toInstant(), resumed);   // a hidden card fetches nothing
         }
         arrangeCards();
         startTicking();
@@ -464,9 +474,20 @@ final class HomeWidgets {
     private static final String PREF_MATCHES_KEY = "football_events_key";
     private static final String PREF_FETCHED_AT = "football_fetched_v2";
     private static final String PREF_TRIED_AT = "football_tried_v2";
-    /** FotMob: every 6 hours, and every 15 minutes around a match to follow the score. */
+    /**
+     * FotMob: every 6 hours; every 15 minutes in the 3 hours before a kick-off; about every 2 minutes while a
+     * match is in play (and straight away on return to Home when the data is over a minute old); and a few
+     * more times in the minutes after FotMob marks it finished, while the summary catches up.
+     */
     private static final long FOTMOB_EVERY_MS = 6 * 3600_000L;
     private static final long NEAR_MATCH_MS = 15 * 60_000L;
+    private static final long IN_PLAY_EVERY_MS = 110_000L;   // under 2 minutes, so every second minute tick fetches
+    private static final long RESUME_AFTER_MS = 60_000L;
+    private static final long SETTLE_EVERY_MS = 60_000L;
+    private static final long SETTLE_FOR_MS = 8 * 60_000L;
+    private static final String PREF_SETTLE_UNTIL = "football_settle_until";
+    /** A match FotMob still calls in play this long after kick-off is taken as over (stale data, TV was off). */
+    private static final Duration IN_PLAY_MAX = Duration.ofHours(4);
     /** Gemini: once a day, and once after each match has ended (to pick up the result and what is next). */
     private static final long GEMINI_EVERY_MS = 24 * 3600_000L;
     private static final long RETRY_MS = 30 * 60_000L;
@@ -481,9 +502,14 @@ final class HomeWidgets {
         final String homeName, awayName, homeBadge, awayBadge;
         final String league;
         final String score;
+        /** FotMob's own status; false for Gemini, which only knows the clock. */
+        final boolean hasStatus, started, finished;
+        /** The minute FotMob shows while in play ("67'"), "HT" at half time, or "". */
+        final String liveText;
 
         Match(Instant start, boolean home, boolean noTime, String homeName, String awayName, String homeBadge,
-              String awayBadge, String league, String score) {
+              String awayBadge, String league, String score, boolean hasStatus, boolean started, boolean finished,
+              String liveText) {
             this.start = start;
             this.home = home;
             this.noTime = noTime;
@@ -493,6 +519,27 @@ final class HomeWidgets {
             this.awayBadge = awayBadge;
             this.league = league;
             this.score = score;
+            this.hasStatus = hasStatus;
+            this.started = started;
+            this.finished = finished;
+            this.liveText = liveText;
+        }
+
+        /** 0 not started, 1 in play, 2 over. */
+        int phase(Instant now) {
+            if (hasStatus) {
+                if (finished) return 2;
+                if (!started) return 0;
+                return now.isBefore(start.plus(IN_PLAY_MAX)) ? 1 : 2;
+            }
+            if (!start.plus(LIVE).isAfter(now)) return 2;
+            return !now.isBefore(start) && !noTime ? 1 : 0;
+        }
+
+        /** The text for the live tag: the minute, "Jeda" at half time, or plain "LIVE". */
+        String liveLabel() {
+            if (liveText.equals("HT")) return "Jeda";
+            return liveText.isEmpty() ? "LIVE" : liveText;
         }
 
         String opponent() {
@@ -514,6 +561,7 @@ final class HomeWidgets {
     static void forgetMatches(Context context) {
         context.getSharedPreferences(Config.SETTINGS_NAME, Context.MODE_PRIVATE).edit()
                 .remove(PREF_MATCHES).remove(PREF_MATCHES_KEY).remove(PREF_FETCHED_AT).remove(PREF_TRIED_AT)
+                .remove(PREF_SETTLE_UNTIL)
                 .remove(FootballSource.PREF_ERROR).apply();
     }
 
@@ -535,8 +583,9 @@ final class HomeWidgets {
 
     /** A finished match stays listed, with its score, until midnight after the day it ended. */
     private static boolean stillListed(Match m, Instant now) {
+        if (m.phase(now) == 1) return true;
         Instant end = m.start.plus(LIVE);
-        if (end.isAfter(now)) return true;
+        if (end.isAfter(now) && !(m.hasStatus && m.finished)) return true;
         java.time.ZonedDateTime midnight = end.atZone(ZoneId.systemDefault()).toLocalDate().plusDays(1)
                 .atStartOfDay(ZoneId.systemDefault());
         return midnight.toInstant().isAfter(now);
@@ -576,13 +625,14 @@ final class HomeWidgets {
             ballDates[i].setText(m.noTime ? local.format(dateOnly) + " –" : local.format(withTime));
             ballOpponents[i].setText((m.home ? "vs " : "@ ") + m.opponent());
             Badges.show(ballLogos[i], m.home ? m.awayBadge : m.homeBadge, io, main, true);
-            boolean over = !m.start.plus(LIVE).isAfter(now);
-            boolean live = !now.isBefore(m.start) && !over && !m.noTime;
+            int phase = m.phase(now);
+            boolean over = phase == 2;
+            boolean live = phase == 1;
             if (over && !m.score.isEmpty()) {
                 ballTags[i].setText(m.score);
                 ballTags[i].setTextColor(0xFF7FE0A0);
             } else if (live) {
-                ballTags[i].setText(m.score.isEmpty() ? "● LIVE" : "● " + m.score);
+                ballTags[i].setText("● " + (m.score.isEmpty() ? m.liveLabel() : m.score + " " + m.liveLabel()));
                 ballTags[i].setTextColor(MonthView.RED);
             } else {
                 ballTags[i].setText(tag(m.league));
@@ -608,7 +658,7 @@ final class HomeWidgets {
         return initials.toString();
     }
 
-    private void maybeFetch(Instant now) {
+    private void maybeFetch(Instant now, boolean resumed) {
         if (fetching) return;
         String key = cacheKey();
         String source = FootballSource.source(activity);
@@ -616,23 +666,41 @@ final class HomeWidgets {
         boolean ours = key.equals(prefs.getString(PREF_MATCHES_KEY, ""));
         long fetchedAt = ours ? prefs.getLong(PREF_FETCHED_AT, 0) : 0;
         long triedAt = prefs.getLong(PREF_TRIED_AT, 0);
-        if (t - triedAt < RETRY_MS && triedAt > fetchedAt) return;   // the last attempt failed: back off
+        List<Match> cached = ours ? cachedMatches() : Collections.<Match>emptyList();
+        boolean fotmob = !FootballSource.GEMINI.equals(source);
+        // FotMob says a match is in play, or its kick-off has passed and FotMob has not yet said it started.
+        boolean inPlay = false;
+        if (fotmob) {
+            for (Match m : cached) {
+                if (!m.hasStatus) continue;
+                boolean playing = m.phase(now) == 1;
+                boolean kickedOff = !m.started && !m.finished && !m.noTime && !now.isBefore(m.start)
+                        && now.isBefore(m.start.plus(Duration.ofHours(3)));
+                if (playing || kickedOff) inPlay = true;
+            }
+        }
+        // A failed attempt backs off for half an hour, but only a minute while a match is on.
+        long retry = inPlay ? 60_000L : RETRY_MS;
+        if (t - triedAt < retry && triedAt > fetchedAt) return;
         boolean due;
         if (fetchedAt == 0) {
             due = true;
-        } else if (FootballSource.GEMINI.equals(source)) {
+        } else if (!fotmob) {
             due = t - fetchedAt >= GEMINI_EVERY_MS;
-            for (Match m : cachedMatches()) {
+            for (Match m : cached) {
                 // Half an hour after a match ends, ask once more for its result and what comes next.
                 long after = m.start.plus(LIVE).plusSeconds(1800).toEpochMilli();
                 if (after <= t && after > fetchedAt) due = true;
             }
         } else {
             long every = FOTMOB_EVERY_MS;
-            for (Match m : cachedMatches()) {
-                if (m.start.isBefore(now.plus(Duration.ofHours(3))) && m.start.plus(LIVE).isAfter(now)) every = NEAR_MATCH_MS;
+            for (Match m : cached) {
+                if (m.phase(now) != 2 && m.start.isBefore(now.plus(Duration.ofHours(3)))) every = NEAR_MATCH_MS;
             }
+            if (inPlay) every = resumed ? RESUME_AFTER_MS : IN_PLAY_EVERY_MS;
             due = t - fetchedAt >= every;
+            // Just after FotMob marked a match finished: a few more fetches while the form and table catch up.
+            if (t < prefs.getLong(PREF_SETTLE_UNTIL, 0) && t - fetchedAt >= SETTLE_EVERY_MS) due = true;
         }
         if (!due) return;
         fetching = true;
@@ -654,8 +722,13 @@ final class HomeWidgets {
                 fetching = false;
                 if (!key.equals(cacheKey())) return;   // team or source changed meanwhile
                 if (result != null) {
+                    long settleUntil = prefs.getLong(PREF_SETTLE_UNTIL, 0);
+                    if (justFinished(cached, parse(result, teamId))) {
+                        settleUntil = System.currentTimeMillis() + SETTLE_FOR_MS;
+                    }
                     prefs.edit().putString(PREF_MATCHES, result).putString(PREF_MATCHES_KEY, key)
                             .putLong(PREF_FETCHED_AT, System.currentTimeMillis())
+                            .putLong(PREF_SETTLE_UNTIL, settleUntil)
                             .remove(FootballSource.PREF_ERROR).apply();
                 } else {
                     prefs.edit().putString(FootballSource.PREF_ERROR, message).apply();
@@ -663,6 +736,17 @@ final class HomeWidgets {
                 if (!activity.isFinishing()) updateFootball(Instant.now());
             });
         });
+    }
+
+    /** A match that was not finished in the old fixtures and is in the new ones (matched by kick-off time). */
+    private static boolean justFinished(List<Match> before, List<Match> after) {
+        for (Match a : after) {
+            if (!a.hasStatus || !a.finished) continue;
+            for (Match b : before) {
+                if (b.hasStatus && !b.finished && b.start.equals(a.start)) return true;
+            }
+        }
+        return false;
     }
 
     private static List<Match> parse(String json, String teamId) {
@@ -681,7 +765,9 @@ final class HomeWidgets {
                 String score = hs.isEmpty() || as.isEmpty() ? "" : hs + " - " + as;
                 out.add(new Match(start, home, e.optBoolean("noTime"), clean(e.optString("strHomeTeam")),
                         clean(e.optString("strAwayTeam")), clean(e.optString("strHomeTeamBadge")),
-                        clean(e.optString("strAwayTeamBadge")), clean(e.optString("strLeague")), score));
+                        clean(e.optString("strAwayTeamBadge")), clean(e.optString("strLeague")), score,
+                        e.optBoolean("fmStatus"), e.optBoolean("fmStarted"), e.optBoolean("fmFinished"),
+                        clean(e.optString("liveText"))));
             }
         } catch (Exception ignored) {
             // A malformed cache shows as "no schedule" until the next fetch replaces it.
@@ -896,19 +982,25 @@ final class HomeWidgets {
             text(r, "fullHeader", "Jadwal " + teamName);
             text(r, "fullLeague", "");
         }
+        // A match in play comes first; a match that has just ended stays up with its final score until the
+        // list drops it at midnight (as in the classic card), and only then does the next match take over.
         Match featured = null;
         int featuredIndex = -1;
+        int firstOpen = list.size();
         for (int i = 0; i < list.size(); i++) {
-            if (list.get(i).start.plus(LIVE).isAfter(now)) {
-                featured = list.get(i);
-                featuredIndex = i;
+            if (list.get(i).phase(now) != 2) {
+                firstOpen = i;
                 break;
             }
         }
-        if (featured == null && !list.isEmpty()) {
-            featuredIndex = list.size() - 1;
-            featured = list.get(featuredIndex);
+        if (firstOpen < list.size() && list.get(firstOpen).phase(now) == 1) {
+            featuredIndex = firstOpen;
+        } else if (firstOpen > 0) {
+            featuredIndex = firstOpen - 1;     // the most recent finished match
+        } else if (firstOpen < list.size()) {
+            featuredIndex = firstOpen;
         }
+        if (featuredIndex >= 0) featured = list.get(featuredIndex);
         View mainRow = r.findViewById(R.id.fullMain);
         TextView empty = r.findViewById(R.id.fullEmpty);
         ballNextAt = 0;
@@ -928,8 +1020,9 @@ final class HomeWidgets {
             Badges.show(r.findViewById(R.id.fullHomeLogo), m.homeBadge, io, main, true);
             Badges.show(r.findViewById(R.id.fullAwayLogo), m.awayBadge, io, main, true);
             ZonedDateTime local = m.start.atZone(ZoneId.systemDefault());
-            boolean over = !m.start.plus(LIVE).isAfter(now);
-            boolean live = !now.isBefore(m.start) && !over && !m.noTime;
+            int phase = m.phase(now);
+            boolean over = phase == 2;
+            boolean live = phase == 1;
             TextView time = find(r, "fullTime");
             TextView countdown = find(r, "fullCountdown");
             if (over) {
@@ -941,7 +1034,7 @@ final class HomeWidgets {
                 time.setText(m.score.isEmpty() ? "LIVE" : m.score.replace("-", " - "));
                 time.setTextColor(MonthView.RED);
                 text(r, "fullDay", "Sedang berlangsung");
-                countdown.setText("\u25CF LIVE");
+                countdown.setText("\u25CF " + m.liveLabel());
                 countdown.setTextColor(MonthView.RED);
                 ballLive = true;
             } else {
