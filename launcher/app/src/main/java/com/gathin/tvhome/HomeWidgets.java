@@ -401,6 +401,33 @@ final class HomeWidgets {
     }
 
     /** "17 Jumadil Awal 1448 H", the day as the TV's clock reads it (Umm al-Qura). */
+    private static final String[] HIJRI_SHORT = {"Muharram", "Safar", "R. Awal", "R. Akhir",
+            "J. Awal", "J. Akhir", "Rajab", "Sya'ban", "Ramadhan", "Syawal", "Dzulqa'dah", "Dzulhijjah"};
+
+    /** "11 J. Akhir 1448 H": the same day with the long month names shortened. */
+    private static String hijriShort(ZonedDateTime now) {
+        String full = hijriText(now, false);
+        for (int i = 0; i < HIJRI_MONTHS.length; i++) {
+            if (full.contains(HIJRI_MONTHS[i])) return full.replace(HIJRI_MONTHS[i], HIJRI_SHORT[i]);
+        }
+        return full;
+    }
+
+    /** The full text where it fits on one line, the short one where it would be cut. */
+    private void fit(TextView t, String full, String brief) {
+        View parent = (View) t.getParent();
+        int room = parent.getWidth() - parent.getPaddingLeft() - parent.getPaddingRight();
+        if (room <= 0) {
+            t.setText(full);
+            if (t.getTag(R.id.prayerCard) == null) {
+                t.setTag(R.id.prayerCard, Boolean.TRUE);       // one retry once the card has been laid out
+                t.post(() -> fit(t, full, brief));
+            }
+            return;
+        }
+        t.setText(t.getPaint().measureText(full) <= room ? full : brief);
+    }
+
     private static String hijriText(ZonedDateTime now, boolean twoLines) {
         try {
             android.icu.util.IslamicCalendar hijri = new android.icu.util.IslamicCalendar();
@@ -716,7 +743,9 @@ final class HomeWidgets {
     static final String PREF_BALL_SKIN = "widget_ball_skin";
     static final String[] PRAYER_SKINS = {"Klasik", "Hitung mundur besar", "Bilah progres"};
     static final String[] BALL_SKINS = {"Klasik", "Lengkap"};
-    private static final int ROW_DP = 140, RICH_ROW_DP = 190;
+    private static final int ROW_DP = 140, BAR_DP = 155, BIG_DP = 175, FULL_DP = 190;
+    /** Launcher settings → Widget Home: every card as tall as the tallest (on), or each its own height. */
+    static final String PREF_SAME_HEIGHT = "widget_same_height";
     private static final int GREEN = 0xFF4ADE80, YELLOW = 0xFFFFC83D;
 
     private int prayerSkin = -1, ballSkin = -1;
@@ -762,12 +791,29 @@ final class HomeWidgets {
             }
             if (skinBallFull != null) skinBallFull.setVisibility(bs == 1 ? View.VISIBLE : View.GONE);
         }
-        boolean rich = (prayerShown && ps != 0) || (ballShown && bs != 0);
-        ViewGroup.LayoutParams lp = row.getLayoutParams();
-        int height = (int) ((rich ? RICH_ROW_DP : ROW_DP) * density);
-        if (lp != null && lp.height != height) {
-            lp.height = height;
-            row.setLayoutParams(lp);
+        // Each look has the height its content needs; the row is as tall as the tallest card showing, and
+        // either every card matches it (Sejajarkan tinggi kartu on) or each keeps its own, tops in line.
+        int prayerDp = ps == 1 ? BIG_DP : ps == 2 ? BAR_DP : ROW_DP;
+        int ballDp = bs == 1 ? FULL_DP : ROW_DP;
+        boolean calendarShown = prefs.getBoolean(PREF_SHOW_CALENDAR, true);
+        int rowDp = Math.max(calendarShown ? ROW_DP : 0,
+                Math.max(prayerShown ? prayerDp : 0, ballShown ? ballDp : 0));
+        if (rowDp == 0) rowDp = ROW_DP;
+        boolean same = prefs.getBoolean(PREF_SAME_HEIGHT, true);
+        setHeight(row, rowDp);
+        setHeight(prayerCard, same ? -1 : prayerDp);
+        setHeight(ballCard, same ? -1 : ballDp);
+        setHeight(calCard, same ? -1 : ROW_DP);
+    }
+
+    /** dp, or -1 for match_parent. */
+    private void setHeight(View v, int dp) {
+        ViewGroup.LayoutParams lp = v.getLayoutParams();
+        if (lp == null) return;
+        int h = dp < 0 ? ViewGroup.LayoutParams.MATCH_PARENT : (int) (dp * density);
+        if (lp.height != h) {
+            lp.height = h;
+            v.setLayoutParams(lp);
         }
     }
 
@@ -786,7 +832,9 @@ final class HomeWidgets {
         prayerPrevAt = midnight.plusMinutes(prevMinute).toInstant().toEpochMilli();
         int highlight = next >= 0 ? next : PrayerTimes.SUBUH;
         String masehi = today.format(DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", ID));
+        String masehiShort = today.format(DateTimeFormatter.ofPattern("EEE, d MMM yyyy", ID));
         String hijri = hijriText(now, false);
+        String hijriBrief = hijriShort(now);
         boolean big = prayerSkin == 1;
         View root = big ? skinPrayerBig : skinPrayerBar;
         String pre = big ? "big" : "bar";
@@ -794,12 +842,12 @@ final class HomeWidgets {
         text(root, pre + "NextName", nextName);
         text(root, pre + "NextTime", hhmm(nextMinute % 1440).replace('.', ':'));
         if (big) {
-            text(root, "bigHijri", hijri);
-            text(root, "bigDate", masehi);
+            fit(find(root, "bigHijri"), hijri, hijriBrief);
+            fit(find(root, "bigDate"), masehi, masehiShort);
             text(root, "bigPlace", place);
         } else {
             text(root, "barPlace", place);
-            text(root, "barHijri", hijri);
+            fit(find(root, "barHijri"), hijri, hijriBrief);
             text(root, "barDate", masehi);
         }
         for (int i = 0; i < PrayerTimes.PRAYERS.length; i++) {

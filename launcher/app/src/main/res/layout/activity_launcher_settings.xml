@@ -194,6 +194,10 @@
             android:id="@+id/ballSkinChoice"
             style="@style/SettingsRow"
             android:layout_marginTop="10dp" />
+        <TextView
+            android:id="@+id/sameHeightChoice"
+            style="@style/SettingsRow"
+            android:layout_marginTop="10dp" />
 
         <TextView
             style="@style/SettingsGroupHeader"

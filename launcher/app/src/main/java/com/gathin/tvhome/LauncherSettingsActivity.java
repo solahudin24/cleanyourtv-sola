@@ -350,6 +350,15 @@ public final class LauncherSettingsActivity extends Activity {
             ballSkin.setText("Gaya kartu bola: " + HomeWidgets.BALL_SKINS[HomeWidgets.ballSkinOf(choices)]);
         };
         skinLabels.run();
+        TextView sameHeight = findViewById(R.id.sameHeightChoice);
+        Runnable heightLabel = () -> sameHeight.setText("Sejajarkan tinggi kartu: "
+                + (choices.getBoolean(HomeWidgets.PREF_SAME_HEIGHT, true) ? "On" : "Off"));
+        heightLabel.run();
+        sameHeight.setOnClickListener(v -> {
+            choices.edit().putBoolean(HomeWidgets.PREF_SAME_HEIGHT,
+                    !choices.getBoolean(HomeWidgets.PREF_SAME_HEIGHT, true)).apply();
+            heightLabel.run();
+        });
         prayerSkin.setOnClickListener(v -> {
             choices.edit().putInt(HomeWidgets.PREF_PRAYER_SKIN,
                     (HomeWidgets.prayerSkinOf(choices) + 1) % HomeWidgets.PRAYER_SKINS.length).apply();
